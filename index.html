@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>DeployMate Alpha Brain — Meeting</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link rel="stylesheet" href="/static/meet/css/meet.css?v=20260829-3"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <style>
+    .material-symbols-outlined {
+      font-family: 'Material Symbols Outlined';
+      font-weight: normal;
+      font-style: normal;
+      font-size: 20px;
+      line-height: 1;
+      display: inline-block;
+      -webkit-font-smoothing: antialiased;
+    }
+  </style>
+</head>
+<body class="bg-white text-black font-['Inter'] h-screen w-screen flex flex-col justify-between overflow-hidden">
+
+  <!-- Join Meeting Lobby Modal -->
+  <div id="meeting-lobby" class="fixed inset-0 z-[100] bg-white/95 backdrop-blur-sm flex items-center justify-center p-6">
+    <form id="join-form" class="bg-white w-full max-w-md border border-black p-8 space-y-5 shadow-2xl">
+      <div class="flex items-center gap-3 pb-3 border-b border-black">
+        <!-- AlphaBrain Neural Logo SVG -->
+        <svg class="w-8 h-8" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="6" cy="20" r="2.5" fill="#000000"/>
+          <circle cx="15" cy="11" r="2.5" fill="#000000"/>
+          <circle cx="15" cy="20" r="2.5" fill="#000000"/>
+          <circle cx="15" cy="29" r="2.5" fill="#000000"/>
+          <circle cx="25" cy="14" r="2.5" fill="#000000"/>
+          <circle cx="25" cy="26" r="2.5" fill="#000000"/>
+          <circle cx="34" cy="20" r="3.5" fill="#E6391E"/>
+          <line x1="6" y1="20" x2="15" y2="11" stroke="#000000" stroke-width="1.2"/>
+          <line x1="6" y1="20" x2="15" y2="20" stroke="#000000" stroke-width="1.2"/>
+          <line x1="6" y1="20" x2="15" y2="29" stroke="#000000" stroke-width="1.2"/>
+          <line x1="15" y1="11" x2="25" y2="14" stroke="#000000" stroke-width="1.2"/>
+          <line x1="15" y1="20" x2="25" y2="14" stroke="#000000" stroke-width="1.2"/>
+          <line x1="15" y1="20" x2="25" y2="26" stroke="#000000" stroke-width="1.2"/>
+          <line x1="15" y1="29" x2="25" y2="26" stroke="#000000" stroke-width="1.2"/>
+          <line x1="25" y1="14" x2="34" y2="20" stroke="#E6391E" stroke-width="1.5"/>
+          <line x1="25" y1="26" x2="34" y2="20" stroke="#E6391E" stroke-width="1.5"/>
+        </svg>
+        <span class="font-display font-bold text-xl tracking-tight">AlphaBrain</span>
+      </div>
+
+      <div>
+        <h1 class="font-display text-lg font-bold text-black">Join Meeting</h1>
+        <p class="text-xs text-neutral-500 mt-1">LiveKit WebRTC meeting room with Eva voice participant.</p>
+      </div>
+
+      <label class="block text-xs font-semibold text-neutral-700">Your Name
+        <input id="identity-input" required maxlength="128" value="Ajay (Founder)" class="mt-1.5 w-full border border-black px-3.5 py-2 text-sm text-black focus:outline-none focus:ring-1 focus:ring-black"/>
+      </label>
+
+      <label class="block text-xs font-semibold text-neutral-700">Room ID
+        <input id="room-input" required pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,127}" value="deploymate-main" class="mt-1.5 w-full border border-black px-3.5 py-2 text-sm text-black font-mono focus:outline-none focus:ring-1 focus:ring-black"/>
+      </label>
+
+      <label id="api-token-field" class="block text-xs font-semibold text-neutral-700">Access Token
+        <input id="api-token-input" type="password" autocomplete="off" placeholder="Founder bearer token" class="mt-1.5 w-full border border-black px-3.5 py-2 text-sm text-black focus:outline-none focus:ring-1 focus:ring-black"/>
+      </label>
+
+      <!-- Language Selection -->
+      <label class="block text-xs font-semibold text-neutral-700">Your Language
+        <select id="language-select" class="mt-1.5 w-full border border-black px-3.5 py-2 text-sm bg-white">
+          <option value="hi" selected>Hindi (हिन्दी)</option>
+          <option value="en">English</option>
+          <option value="zh">Chinese (中文)</option>
+          <option value="ja">Japanese (日本語)</option>
+          <option value="ko">Korean (한국어)</option>
+          <option value="ar">Arabic (العربية)</option>
+          <option value="es">Spanish (Español)</option>
+          <option value="fr">French (Français)</option>
+          <option value="de">German (Deutsch)</option>
+          <option value="pt">Portuguese (Português)</option>
+        </select>
+      </label>
+
+      <!-- Live Translate Toggle -->
+      <label class="flex items-center gap-2 text-xs font-semibold text-neutral-700">
+        <input id="translate-toggle" type="checkbox" checked class="accent-black w-4 h-4 rounded-none border-black"/>
+        Enable Live Translation
+      </label>
+
+      <p id="join-error" class="hidden text-xs text-[#E6391E] border border-[#E6391E] p-2" role="alert"></p>
+
+      <button id="join-btn" type="submit" class="w-full py-2.5 bg-black text-white font-semibold text-sm hover:bg-neutral-800 active:scale-[0.99] transition-all">
+        JOIN ROOM
+      </button>
+    </form>
+  </div>
+
+  <!-- Top Header Navigation -->
+  <header class="h-16 border-b border-black flex items-center justify-between px-6 shrink-0 bg-white z-30">
+    <!-- Left Logo & Title -->
+    <div class="flex items-center gap-3.5">
+      <!-- Neural Icon -->
+      <svg class="w-8 h-8" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="6" cy="20" r="2.5" fill="#000000"/>
+        <circle cx="15" cy="11" r="2.5" fill="#000000"/>
+        <circle cx="15" cy="20" r="2.5" fill="#000000"/>
+        <circle cx="15" cy="29" r="2.5" fill="#000000"/>
+        <circle cx="25" cy="14" r="2.5" fill="#000000"/>
+        <circle cx="25" cy="26" r="2.5" fill="#000000"/>
+        <circle cx="34" cy="20" r="3.5" fill="#E6391E"/>
+        <line x1="6" y1="20" x2="15" y2="11" stroke="#000000" stroke-width="1.2"/>
+        <line x1="6" y1="20" x2="15" y2="20" stroke="#000000" stroke-width="1.2"/>
+        <line x1="6" y1="20" x2="15" y2="29" stroke="#000000" stroke-width="1.2"/>
+        <line x1="15" y1="11" x2="25" y2="14" stroke="#000000" stroke-width="1.2"/>
+        <line x1="15" y1="20" x2="25" y2="14" stroke="#000000" stroke-width="1.2"/>
+        <line x1="15" y1="20" x2="25" y2="26" stroke="#000000" stroke-width="1.2"/>
+        <line x1="15" y1="29" x2="25" y2="26" stroke="#000000" stroke-width="1.2"/>
+        <line x1="25" y1="14" x2="34" y2="20" stroke="#E6391E" stroke-width="1.5"/>
+        <line x1="25" y1="26" x2="34" y2="20" stroke="#E6391E" stroke-width="1.5"/>
+      </svg>
+      <span class="font-display text-2xl font-bold tracking-tight text-black">AlphaBrain</span>
+    </div>
+
+    <!-- Right Meeting Status & Actions -->
+    <div class="flex items-center h-full">
+      <div class="font-mono-tech text-xs uppercase tracking-wider font-semibold text-black px-6">
+        MEETING LIVE
+      </div>
+      <div class="h-full w-px bg-black"></div>
+      <div class="flex items-center gap-2 px-6 text-black">
+        <span class="material-symbols-outlined text-[18px]">group</span>
+        <span id="participant-count" class="font-mono-tech text-xs font-semibold">1</span>
+      </div>
+      <div class="h-full w-px bg-black"></div>
+      <button id="header-invite-btn" type="button" class="flex items-center gap-2 px-6 h-full text-black hover:bg-neutral-50 transition-colors font-mono-tech text-xs uppercase font-semibold" title="Copy Invite Link">
+        <span class="material-symbols-outlined text-[18px]">upload</span>
+        <span>SHARE</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Meeting Content Area -->
+  <main class="flex-1 flex overflow-hidden">
+    
+    <!-- Stage Area: Dynamically adapts layout based on participant count -->
+    <div class="flex-1 p-5 overflow-hidden">
+      
+      <div id="stage-grid" class="stage-grid layout-2">
+        
+        <!-- Tile 1: Founder (Local) -->
+        <div id="local-tile" class="video-tile-container relative flex items-center justify-center bg-black">
+          <video id="local-video" class="w-full h-full object-cover" autoplay playsinline muted></video>
+          
+          <!-- Screen Share Floating PIP Card (Shown only when sharing) -->
+          <div id="screen-share-stage" class="absolute bottom-6 left-6 w-64 pip-share-card p-3 z-20 hidden">
+            <div class="flex items-center justify-between border-b border-black/10 pb-1.5 mb-2">
+              <span class="font-mono-tech text-[9px] uppercase font-bold text-black">SCREEN SHARE</span>
+              <span class="font-mono-tech text-[9px] uppercase font-bold text-[#E6391E]">LIVE</span>
+            </div>
+            <div id="slide-content" class="flex items-center justify-between">
+              <div class="text-[10px] font-mono text-black font-bold">Screen active</div>
+              <button id="stage-screen-btn" type="button" class="border border-black text-[8px] font-mono font-bold uppercase py-0.5 px-2 hover:bg-black hover:text-white transition-colors">
+                STOP
+              </button>
+            </div>
+          </div>
+
+          <!-- Speaker Name Tag -->
+          <div class="speaker-badge">
+            <span class="w-2 h-2 rounded-full bg-[#E6391E]"></span>
+            <span id="local-name">Ajay (Founder)</span>
+          </div>
+        </div>
+
+        <!-- Tile 2: Eva AI Architect (Gemini Live Audio) -->
+        <div id="eva-tile" class="video-tile-container relative bg-neutral-950 flex flex-col items-center justify-center">
+          <!-- Active Waveform Indicator -->
+          <div id="eva-wave" class="absolute top-4 right-4 z-10 hidden">
+            <div class="active-wave">
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+
+          <!-- Subtle Center Graphic for Eva -->
+          <div class="flex flex-col items-center gap-3 text-neutral-400">
+            <div class="w-16 h-16 rounded-full border border-neutral-700 bg-neutral-900 flex items-center justify-center shadow-lg">
+              <span class="material-symbols-outlined text-[28px] text-[#E6391E]">graphic_eq</span>
+            </div>
+            <div class="font-mono-tech text-[11px] uppercase tracking-widest text-neutral-400">
+              Gemini Live Voice Active
+            </div>
+          </div>
+
+          <!-- Speaker Tag -->
+          <div class="speaker-badge">
+            <span class="w-2 h-2 rounded-full bg-[#E6391E]"></span>
+            <span id="eva-status-text">Eva (AI Architect)</span>
+          </div>
+        </div>
+
+        <!-- Remote Participants Container (Dynamic stack for when external clients join) -->
+        <div id="remote-stack" class="flex flex-col gap-3.5 h-full hidden">
+          <!-- Remote Human Client Tile -->
+          <div id="remote-human-tile" class="flex-1 video-tile-container relative bg-neutral-900 flex items-center justify-center">
+            <div id="remote-human-placeholder" class="text-white/40 flex flex-col items-center">
+              <span class="material-symbols-outlined text-[32px]">person</span>
+            </div>
+            <div class="speaker-badge">
+              <span id="remote-human-name">Client</span>
+              <span id="remote-human-mic" class="material-symbols-outlined text-[13px] text-white/60 ml-1">mic</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Live Notes / Real-Time Transcript Drawer (Far Right) -->
+    <aside id="transcript-drawer" class="w-80 border-l border-black flex flex-col h-full bg-white shrink-0">
+      <!-- Live Notes Header -->
+      <div class="p-4 border-b border-black flex items-center justify-between">
+        <h2 class="font-mono-tech text-xs uppercase font-bold tracking-wider text-black">LIVE NOTES</h2>
+        <span class="font-mono text-[10px] text-neutral-400">PCM 24kHz</span>
+      </div>
+
+      <!-- Real-Time Transcript Feed -->
+      <div id="transcript-list" class="flex-1 overflow-y-auto divide-y divide-black/10 text-xs">
+        <div id="transcript-empty" class="p-6 text-center font-mono text-neutral-400 text-xs">
+          Speech will transcribe here live...
+        </div>
+      </div>
+
+      <!-- Chat / Prompt Input Form -->
+      <div class="p-3 border-t border-black bg-neutral-50">
+        <form id="chat-form" class="flex gap-2">
+          <input id="chat-input" type="text" placeholder="Type message or ask Eva..." class="flex-1 border border-black px-3 py-1.5 text-xs text-black font-mono focus:outline-none focus:ring-1 focus:ring-black bg-white"/>
+          <button type="submit" class="border border-black px-3 py-1.5 text-xs font-mono font-bold bg-black text-white hover:bg-neutral-800 transition-colors">
+            ADD
+          </button>
+        </form>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- Bottom Bar Control Strip -->
+  <footer class="h-20 border-t border-black bg-white flex items-center justify-between px-8 shrink-0 z-30">
+    <!-- Controls Group -->
+    <div class="flex items-center gap-4">
+      <button id="mic-btn" type="button" class="control-btn-circle" title="Mute / Unmute Microphone">
+        <span class="material-symbols-outlined">mic</span>
+      </button>
+      <button id="cam-btn" type="button" class="control-btn-circle" title="Turn Camera On / Off">
+        <span class="material-symbols-outlined">videocam</span>
+      </button>
+      <button id="transcript-btn" type="button" class="control-btn-circle" title="Toggle Captions / Live Notes">
+        <span class="material-symbols-outlined">closed_caption</span>
+      </button>
+      <button id="prompt-eva-btn" type="button" class="control-btn-circle" title="Ask Eva / Prompt">
+        <span class="material-symbols-outlined">front_hand</span>
+      </button>
+      <button id="screen-btn" type="button" class="control-btn-circle" title="Present Screen">
+        <span class="material-symbols-outlined">upload</span>
+      </button>
+      <button id="footer-invite-btn" type="button" class="control-btn-circle" title="Invite Client">
+        <span class="material-symbols-outlined">person_add</span>
+      </button>
+      <button id="dark-mode-btn" type="button" class="control-btn-circle" title="Toggle Dark Mode">
+        <span class="material-symbols-outlined">dark_mode</span>
+      </button>
+      <button id="language-btn" type="button" class="control-btn-circle" title="Change Language">
+        <span class="material-symbols-outlined">translate</span>
+      </button>
+      
+      <!-- Divider -->
+      <div class="h-8 w-px bg-black/20 mx-2"></div>
+      
+      <!-- End Call Red Button -->
+      <button id="end-call-btn" type="button" class="control-btn-endcall" title="End Call">
+        <span class="material-symbols-outlined">call_end</span>
+      </button>
+    </div>
+
+    <!-- Timer Right -->
+    <div class="flex items-center h-full">
+      <div class="h-full w-px bg-black mr-6"></div>
+      <div id="session-timer" class="font-mono text-sm font-semibold tracking-wider text-black">
+        00:00:00
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.0/dist/livekit-client.umd.min.js"></script>
+  <script src="/static/meet/js/meet.js?v=20260829-3"></script>
+</body>
+</html>
