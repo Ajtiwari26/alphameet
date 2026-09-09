@@ -1,0 +1,260 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap');
+
+:root {
+  --color-paper: #ffffff;
+  --color-ink: #000000;
+  --color-ink-light: #111111;
+  --color-border: #000000;
+  --color-border-subtle: #e5e5e5;
+  --color-signal: #E6391E;
+  --color-signal-deep: #C90C0F;
+  --font-display: 'Space Grotesk', -apple-system, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Fira Code', monospace;
+  --ease-out-soft: cubic-bezier(0.215, 0.61, 0.355, 1);
+  --ease-out-hard: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  position: relative;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography Helpers */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.font-mono-tech {
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+}
+
+/* Dynamic Video Grid Layouts */
+.stage-grid {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+  transition: all 0.3s var(--ease-out-soft);
+}
+
+/* 1 Participant: Centered Hero */
+.stage-grid.layout-1 {
+  grid-template-columns: 1fr;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* 2 Participants (You + Eva): Equal 50/50 Split */
+.stage-grid.layout-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* 3+ Participants: Hero (2fr) + Stack (1fr) */
+.stage-grid.layout-3 {
+  grid-template-columns: 2fr 1fr;
+}
+
+/* Video Stage Tiles */
+.video-tile-container {
+  background: #000000;
+  border: 1px solid var(--color-ink);
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-tile-container video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Speaker Badge */
+.speaker-badge {
+  background: rgba(0, 0, 0, 0.85);
+  color: #ffffff;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 10;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Control Buttons */
+.control-btn-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  background: #000000;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s var(--ease-out-soft);
+  border: none;
+  cursor: pointer;
+}
+
+.control-btn-circle:hover {
+  background: #262626;
+  transform: translateY(-1px);
+}
+
+.control-btn-circle:active {
+  transform: translateY(0) scale(0.95);
+}
+
+.control-btn-circle.active-off {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.control-btn-circle.active-on {
+  background: var(--color-signal);
+  color: #ffffff;
+  box-shadow: 0 0 15px rgba(230, 57, 30, 0.4);
+}
+
+.control-btn-endcall {
+  height: 44px;
+  padding: 0 24px;
+  border-radius: 6px;
+  background: var(--color-signal);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s var(--ease-out-soft);
+  border: none;
+  cursor: pointer;
+}
+
+.control-btn-endcall:hover {
+  background: var(--color-signal-deep);
+  transform: translateY(-1px);
+}
+
+/* Screen Share PIP Card */
+.pip-share-card {
+  background: #ffffff;
+  border: 1px solid #000000;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* Active Speaker Waveform Indicator */
+.active-wave {
+  display: flex;
+  align-items: center;
+  gap: 2.5px;
+  height: 16px;
+}
+
+.active-wave span {
+  width: 2.5px;
+  height: 100%;
+  background: var(--color-signal);
+  border-radius: 1px;
+  animation: wavePulse 1.2s infinite ease-in-out alternate;
+}
+
+.active-wave span:nth-child(1) { animation-delay: 0.1s; }
+.active-wave span:nth-child(2) { animation-delay: 0.35s; }
+.active-wave span:nth-child(3) { animation-delay: 0.2s; }
+.active-wave span:nth-child(4) { animation-delay: 0.45s; }
+
+@keyframes wavePulse {
+  0% { transform: scaleY(0.25); }
+  100% { transform: scaleY(1); }
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 3px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #000000;
+}
+
+/* Dark Mode Overrides */
+body.dark {
+  --color-paper: #111111;
+  --color-ink: #ffffff;
+  --color-ink-light: #eeeeee;
+  --color-border: #333333;
+  --color-border-subtle: #444444;
+}
+
+body.dark .bg-white {
+  background-color: var(--color-paper);
+}
+
+body.dark .bg-neutral-50 {
+  background-color: #1a1a1a;
+}
+
+body.dark .text-black {
+  color: var(--color-ink);
+}
+
+body.dark .border-black {
+  border-color: var(--color-border);
+}
+
+body.dark .border-black\/10 {
+  border-color: var(--color-border-subtle);
+}
+
+body.dark .divide-black\/10 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--color-border-subtle);
+}
+
+body.dark .bg-black {
+  background-color: #222222;
+}
+
+body.dark .control-btn-circle {
+  background: #333333;
+  color: #ffffff;
+}
+
+body.dark .control-btn-circle:hover {
+  background: #444444;
+}
+
+body.dark.bg-white {
+  background-color: var(--color-paper);
+}
+
+body.dark.text-black {
+  color: var(--color-ink);
+}
