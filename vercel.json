@@ -1,0 +1,29 @@
+{
+  "name": "alpha-meet",
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://alpha-brain-staging.onrender.com/api/:path*"
+    },
+    {
+      "source": "/static/meet/:path*",
+      "destination": "/:path*"
+    },
+    {
+      "source": "/meet",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    }
+  ]
+}
