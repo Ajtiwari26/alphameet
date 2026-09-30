@@ -1,4 +1,7 @@
-/** Real LiveKit meeting controller: founder + client + Eva Gemini Live participant. */
+/**
+ * AlphaMeet Controller — Enterprise AI Video Meetings (Google Meet Style)
+ * Handles Homepage, Pre-Join Green Room, LiveKit WebRTC, and Eva Gemini Live participant.
+ */
 
 const EVA_IDENTITY = "eva-cto";
 const EVA_LINKED_PARTICIPANT_ATTRIBUTE = "alpha.eva.linkedParticipant";
@@ -10,10 +13,23 @@ let roomName = "deploymate-main";
 let currentParticipant = "Ajay (Founder)";
 let apiToken = "";
 let inviteToken = "";
+let myLanguage = "hi";
+let translateEnabled = true;
 let isAudioMuted = false;
 let isVideoMuted = false;
 let isScreenSharing = false;
 const transcriptElements = new Map();
+
+// Media preview state in Green Room
+let previewStream = null;
+let previewAudioContext = null;
+let previewAnalyser = null;
+let previewMeterInterval = null;
+
+// Carousel State
+let currentSlide = 0;
+let carouselTimer = null;
+const TOTAL_SLIDES = 4;
 
 function setText(id, value) {
   const element = document.getElementById(id);
@@ -55,12 +71,181 @@ function withTimeout(promise, timeoutMs, label) {
 
 function markMediaUnavailable(controlId, icon, message) {
   const button = document.getElementById(controlId);
-  button?.classList.add("bg-rose-500/80");
+  button?.classList.add("active-off");
   if (button) {
     button.title = message;
     button.innerHTML = `<span class="material-symbols-outlined text-[20px]">${icon}</span>`;
   }
 }
+
+// =========================================================
+// View State Transitions (Homepage, Green Room, Stage, Post)
+// =========================================================
+
+function showView(viewId) {
+  const homepage = document.getElementById("view-homepage");
+  const lobby = document.getElementById("meeting-lobby");
+  const stage = document.getElementById("view-stage");
+  const postCall = document.getElementById("view-post-call");
+  const mainHeader = document.getElementById("main-header");
+
+  if (homepage) homepage.classList.toggle("hidden", viewId !== "homepage");
+  if (lobby) lobby.classList.toggle("hidden", viewId !== "lobby");
+  if (stage) stage.classList.toggle("hidden", viewId !== "stage");
+  if (postCall) postCall.classList.toggle("hidden", viewId !== "postCall");
+  if (mainHeader) mainHeader.classList.toggle("hidden", viewId === "stage");
+
+  if (viewId === "lobby") {
+    startGreenRoomPreview();
+  } else {
+    stopGreenRoomPreview();
+  }
+}
+
+// =========================================================
+// Real-Time Header Clock & Date (Google Meet Signature)
+// =========================================================
+
+function updateHeaderClock() {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const dateStr = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+  setText("header-time", timeStr);
+  setText("header-date", dateStr);
+}
+
+// =========================================================
+// Google Meet Style Carousel Engine
+// =========================================================
+
+function setCarouselSlide(index) {
+  currentSlide = (index + TOTAL_SLIDES) % TOTAL_SLIDES;
+  document.querySelectorAll(".carousel-slide").forEach((slide, idx) => {
+    slide.classList.toggle("active", idx === currentSlide);
+  });
+  document.querySelectorAll(".carousel-dot").forEach((dot, idx) => {
+    dot.classList.toggle("active", idx === currentSlide);
+  });
+}
+
+function startCarouselAutoPlay() {
+  stopCarouselAutoPlay();
+  carouselTimer = setInterval(() => {
+    setCarouselSlide(currentSlide + 1);
+  }, 6000);
+}
+
+function stopCarouselAutoPlay() {
+  if (carouselTimer) {
+    clearInterval(carouselTimer);
+    carouselTimer = null;
+  }
+}
+
+// =========================================================
+// Room Code / Slug Generator
+// =========================================================
+
+function generateMeetingSlug() {
+  const chars = "abcdefghijklmnopqrstuvwxyz";
+  const part = (len) => Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  return `alpha-${part(3)}-${part(3)}`;
+}
+
+// =========================================================
+// Pre-Join Green Room Device Check (Camera & Mic Preview)
+// =========================================================
+
+async function startGreenRoomPreview() {
+  const video = document.getElementById("preview-video");
+  const placeholder = document.getElementById("preview-cam-off-placeholder");
+  const meter = document.getElementById("preview-mic-meter");
+
+  try {
+    previewStream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: true,
+    });
+    if (video) {
+      video.srcObject = previewStream;
+      video.play().catch(() => {});
+    }
+    placeholder?.classList.add("hidden");
+
+    // Audio level meter
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        previewAudioContext = new AudioContextClass();
+        const source = previewAudioContext.createMediaStreamSource(previewStream);
+        previewAnalyser = previewAudioContext.createAnalyser();
+        previewAnalyser.fftSize = 64;
+        source.connect(previewAnalyser);
+
+        const dataArray = new Uint8Array(previewAnalyser.frequencyBinCount);
+        previewMeterInterval = setInterval(() => {
+          if (!previewAnalyser || !meter) return;
+          previewAnalyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+          const avg = sum / dataArray.length;
+          const pct = Math.min(100, Math.max(10, Math.round((avg / 128) * 100)));
+          meter.style.width = `${pct}%`;
+        }, 100);
+      }
+    } catch (audioErr) {
+      console.debug("AudioContext meter notice:", audioErr);
+    }
+  } catch (err) {
+    console.warn("Webcam or mic not available for preview:", err);
+    placeholder?.classList.remove("hidden");
+  }
+}
+
+function stopGreenRoomPreview() {
+  if (previewMeterInterval) {
+    clearInterval(previewMeterInterval);
+    previewMeterInterval = null;
+  }
+  if (previewStream) {
+    previewStream.getTracks().forEach((track) => track.stop());
+    previewStream = null;
+  }
+  if (previewAudioContext && previewAudioContext.state !== "closed") {
+    previewAudioContext.close().catch(() => {});
+    previewAudioContext = null;
+  }
+  const video = document.getElementById("preview-video");
+  if (video) video.srcObject = null;
+}
+
+function togglePreviewMic() {
+  if (!previewStream) return;
+  const audioTrack = previewStream.getAudioTracks()[0];
+  if (audioTrack) {
+    audioTrack.enabled = !audioTrack.enabled;
+    const btn = document.getElementById("preview-mic-toggle");
+    btn?.classList.toggle("bg-[#ea4335]", !audioTrack.enabled);
+    if (btn) btn.innerHTML = `<span class="material-symbols-outlined text-[20px]">${audioTrack.enabled ? "mic" : "mic_off"}</span>`;
+  }
+}
+
+function togglePreviewCam() {
+  if (!previewStream) return;
+  const videoTrack = previewStream.getVideoTracks()[0];
+  const placeholder = document.getElementById("preview-cam-off-placeholder");
+  if (videoTrack) {
+    videoTrack.enabled = !videoTrack.enabled;
+    placeholder?.classList.toggle("hidden", videoTrack.enabled);
+    const btn = document.getElementById("preview-cam-toggle");
+    btn?.classList.toggle("bg-[#ea4335]", !videoTrack.enabled);
+    if (btn) btn.innerHTML = `<span class="material-symbols-outlined text-[20px]">${videoTrack.enabled ? "videocam" : "videocam_off"}</span>`;
+  }
+}
+
+// =========================================================
+// LiveKit Active Meeting Logic & Media
+// =========================================================
 
 async function enableLocalMedia() {
   if (!room) return;
@@ -96,7 +281,6 @@ async function waitForEvaLink(timeoutMs = 3000) {
   return false;
 }
 
-
 function decodeInviteClaims(token) {
   try {
     const encoded = token.split(".")[0].replace(/-/g, "+").replace(/_/g, "/");
@@ -108,23 +292,39 @@ function decodeInviteClaims(token) {
 }
 
 function readLobbyContext() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const queryRoom = urlParams.get("room") || urlParams.get("room_name");
+
   const fragment = new URLSearchParams(window.location.hash.slice(1));
   inviteToken = fragment.get("invite") || "";
+
   const identityInput = document.getElementById("identity-input");
   const roomInput = document.getElementById("room-input");
   const tokenInput = document.getElementById("api-token-input");
 
+  if (queryRoom && roomInput) {
+    roomInput.value = queryRoom;
+    setText("lobby-room-badge", queryRoom);
+    showView("lobby");
+  }
+
   if (inviteToken) {
     const claims = decodeInviteClaims(inviteToken);
     if (claims) {
-      identityInput.value = claims.identity || identityInput.value;
-      roomInput.value = claims.room || roomInput.value;
-      identityInput.readOnly = true;
-      roomInput.readOnly = true;
+      if (identityInput) identityInput.value = claims.identity || identityInput.value;
+      if (roomInput) {
+        roomInput.value = claims.room || roomInput.value;
+        setText("lobby-room-badge", claims.room || roomInput.value);
+      }
+      if (identityInput) identityInput.readOnly = true;
+      if (roomInput) roomInput.readOnly = true;
     }
     document.getElementById("api-token-field")?.classList.add("hidden");
+    showView("lobby");
   } else {
-    tokenInput.value = sessionStorage.getItem("alpha-meet-api-token") || "";
+    if (tokenInput) {
+      tokenInput.value = sessionStorage.getItem("alpha-meet-api-token") || "";
+    }
   }
 }
 
@@ -254,6 +454,7 @@ function clearRemoteParticipant(participant) {
 }
 
 let meetingStartTime = null;
+let timerInterval = null;
 
 function formatElapsed() {
   if (!meetingStartTime) return "00:00:00";
@@ -266,7 +467,8 @@ function formatElapsed() {
 
 function startMeetingTimer() {
   meetingStartTime = Date.now();
-  setInterval(() => {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
     setText("session-timer", formatElapsed());
   }, 1000);
 }
@@ -277,7 +479,6 @@ const translationTimers = new Map();
 
 async function requestLiveTranslation(element, text) {
   if (!text || text.length < 3) return;
-  // If it's already purely simple english with no non-ASCII, skip
   const hasNonAscii = /[^\x00-\x7F]/.test(text);
   const words = text.split(/\s+/);
   if (!hasNonAscii && words.length < 4 && !/\b(namaste|matlab|kya|hai|nahi|accha|theek)\b/i.test(text)) return;
@@ -297,11 +498,11 @@ async function requestLiveTranslation(element, text) {
       let transEl = element.querySelector(".transcript-translation");
       if (!transEl) {
         transEl = document.createElement("p");
-        transEl.className = "transcript-translation font-mono text-[11px] text-neutral-600 dark:text-neutral-300 mt-1.5 pl-2.5 py-1 border-l-2 border-black/60 dark:border-white/60 bg-black/5 dark:bg-white/5 rounded-r";
+        transEl.className = "transcript-translation font-mono text-[11px] text-neutral-300 mt-1.5 pl-2.5 py-1 border-l-2 border-[#e6391e] bg-white/5 rounded-r";
         element.querySelector(".space-y-1")?.appendChild(transEl);
       }
       const languageLabel = document.createElement("span");
-      languageLabel.className = "font-bold text-[10px] uppercase tracking-wider text-black dark:text-white mr-1.5 opacity-75";
+      languageLabel.className = "font-bold text-[10px] uppercase tracking-wider text-[#e6391e] mr-1.5";
       languageLabel.textContent = "EN";
       transEl.replaceChildren(languageLabel, document.createTextNode(data.translated_text));
       const list = document.getElementById("transcript-list");
@@ -316,7 +517,6 @@ function appendTranscript(speaker, text, isEva = false, segmentId = "") {
   const list = document.getElementById("transcript-list");
   if (!list || !text || !text.trim()) return;
 
-  // Remove initial empty placeholder if present
   document.getElementById("transcript-empty")?.remove();
 
   const key = segmentId || (speaker === lastSpeaker ? lastSegmentId : null);
@@ -325,10 +525,10 @@ function appendTranscript(speaker, text, isEva = false, segmentId = "") {
   if (!item) {
     const newId = segmentId || `seg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     item = document.createElement("div");
-    item.className = "p-4 flex gap-3 border-b border-black/10 transition-opacity";
+    item.className = "p-3 flex gap-2.5 border-b border-white/5 transition-opacity";
 
     const timeSpan = document.createElement("span");
-    timeSpan.className = "font-mono text-neutral-400 font-medium shrink-0 text-xs";
+    timeSpan.className = "font-mono text-neutral-400 font-medium shrink-0 text-[10px]";
     const now = new Date();
     timeSpan.textContent = now.toTimeString().slice(3, 8); // MM:SS
 
@@ -336,11 +536,11 @@ function appendTranscript(speaker, text, isEva = false, segmentId = "") {
     contentDiv.className = "space-y-1 flex-1";
 
     const nameDiv = document.createElement("div");
-    nameDiv.className = `font-mono font-bold text-xs ${isEva ? "text-[#E6391E]" : "text-black"}`;
-    nameDiv.textContent = isEva ? "Eva (DeployMate CTO)" : speaker;
+    nameDiv.className = `font-mono font-bold text-xs ${isEva ? "text-[#E6391E]" : "text-white"}`;
+    nameDiv.textContent = isEva ? "Eva (AI Architect)" : speaker;
 
     const textP = document.createElement("p");
-    textP.className = "transcript-content font-mono text-neutral-800 leading-relaxed text-xs";
+    textP.className = "transcript-content font-mono text-neutral-300 leading-relaxed text-xs";
 
     contentDiv.append(nameDiv, textP);
     item.append(timeSpan, contentDiv);
@@ -356,7 +556,6 @@ function appendTranscript(speaker, text, isEva = false, segmentId = "") {
     contentEl.textContent = text.trim();
   }
 
-  // Trigger debounced live English translation
   if (translationTimers.has(item)) {
     clearTimeout(translationTimers.get(item));
   }
@@ -370,10 +569,8 @@ function appendTranscript(speaker, text, isEva = false, segmentId = "") {
 }
 
 function wireRoomEvents(activeRoom) {
-
   activeRoom
     .on(RoomEvent.TrackPublished, (publication, participant) => {
-      // Subscribe to my translated track
       if (participant.identity.startsWith("translate-")) {
         const langCode = participant.identity.replace("translate-", "");
         if (langCode === myLanguage) {
@@ -382,25 +579,18 @@ function wireRoomEvents(activeRoom) {
       }
     })
     .on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
-      // Mute raw audio if we are translating their language
       if (track.kind === Track.Kind.Audio && translateEnabled && participant.identity !== EVA_IDENTITY && !participant.identity.startsWith("translate-")) {
-          // If the backend had sent participantLanguages mapping, we'd check their language.
-          // For now, if translation is enabled, we mute ALL other human audio tracks.
-          // They will come through the translate track!
-          const audioElement = track.attach();
-          audioElement.muted = true;
-          document.body.appendChild(audioElement); // Keep attached for LiveKit but muted
-          return;
+        const audioElement = track.attach();
+        audioElement.muted = true;
+        document.body.appendChild(audioElement);
+        return;
       }
       if (participant.identity === EVA_IDENTITY && translateEnabled) {
-          // If translation is enabled, we ALSO mute Eva's raw English audio track, 
-          // because it will come through our language's translate track!
-          const audioElement = track.attach();
-          audioElement.muted = true;
-          document.body.appendChild(audioElement);
-          return;
+        const audioElement = track.attach();
+        audioElement.muted = true;
+        document.body.appendChild(audioElement);
+        return;
       }
-      
       attachRemoteTrack(track, participant);
     })
     .on(RoomEvent.TrackUnsubscribed, (track) => {
@@ -434,22 +624,26 @@ function wireRoomEvents(activeRoom) {
     });
 }
 
+// =========================================================
+// Main Meeting Join Function
+// =========================================================
+
 async function joinMeetingRoom(event) {
-  event.preventDefault();
-  currentParticipant = document.getElementById("identity-input").value.trim();
-  roomName = document.getElementById("room-input").value.trim();
+  if (event) event.preventDefault();
+  
+  currentParticipant = document.getElementById("identity-input").value.trim() || "Ajay (Founder)";
+  roomName = document.getElementById("room-input").value.trim() || "deploymate-main";
   apiToken = document.getElementById("api-token-input").value.trim();
   myLanguage = document.getElementById("language-select").value;
   translateEnabled = document.getElementById("translate-toggle").checked;
-  
-  if (!inviteToken && !apiToken) {
-    showJoinError("Alpha Brain access token is required.");
-    return;
-  }
 
   const button = document.getElementById("join-btn");
   button.disabled = true;
-  button.textContent = "Starting Eva…";
+  button.textContent = "Connecting to Eva & LiveKit…";
+
+  // Stop the greenroom preview tracks so LiveKit can take over the webcam cleanly
+  stopGreenRoomPreview();
+
   try {
     if (apiToken) sessionStorage.setItem("alpha-meet-api-token", apiToken);
     const data = await fetchJson("/api/meet/token", {
@@ -471,38 +665,48 @@ async function joinMeetingRoom(event) {
       videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
     });
     wireRoomEvents(room);
-    button.textContent = "Connecting room…";
+    button.textContent = "Entering room…";
     await room.connect(data.livekit_url, data.token);
+
     try {
       await withTimeout(room.startAudio(), 3000, "Audio playback");
     } catch (audioError) {
       console.warn("Automatic audio playback unavailable; user interaction may be required", audioError);
     }
+
     room.remoteParticipants.forEach((participant) => {
       renderRemoteHuman(participant);
       if (participant.identity === EVA_IDENTITY) setEvaState(data.eva?.state || "connected");
     });
+
     setText("local-name", currentParticipant);
     setText("room-name-label", roomName);
     updateParticipantCount();
     startMeetingTimer();
-    document.getElementById("meeting-lobby").classList.add("hidden");
-    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
+
+    // Show Stage
+    showView("stage");
+    window.history.replaceState({}, document.title, `${window.location.pathname}?room=${encodeURIComponent(roomName)}`);
     void enableLocalMedia();
   } catch (error) {
     showJoinError(error.message || "Could not join meeting.");
+    showView("lobby"); // Return to greenroom on error
   } finally {
     button.disabled = false;
-    button.textContent = "Join meeting";
+    button.innerHTML = `<span class="material-symbols-outlined text-[20px]">login</span><span>Join now</span>`;
   }
 }
+
+// =========================================================
+// In-Call Controls
+// =========================================================
 
 async function toggleAudio() {
   if (!room) return;
   isAudioMuted = !isAudioMuted;
   await room.localParticipant.setMicrophoneEnabled(!isAudioMuted);
   const button = document.getElementById("mic-btn");
-  button?.classList.toggle("bg-rose-500/80", isAudioMuted);
+  button?.classList.toggle("active-off", isAudioMuted);
   if (button) button.innerHTML = `<span class="material-symbols-outlined text-[20px]">${isAudioMuted ? "mic_off" : "mic"}</span>`;
 }
 
@@ -512,7 +716,7 @@ async function toggleVideo() {
   await room.localParticipant.setCameraEnabled(!isVideoMuted);
   if (!isVideoMuted) attachLocalCamera();
   const button = document.getElementById("cam-btn");
-  button?.classList.toggle("bg-rose-500/80", isVideoMuted);
+  button?.classList.toggle("active-off", isVideoMuted);
   if (button) button.innerHTML = `<span class="material-symbols-outlined text-[20px]">${isVideoMuted ? "videocam_off" : "videocam"}</span>`;
 }
 
@@ -523,7 +727,7 @@ async function toggleScreenShare() {
     await room.localParticipant.setScreenShareEnabled(nextState);
     isScreenSharing = nextState;
     const button = document.getElementById("screen-btn");
-    button?.classList.toggle("bg-cyan-500/30", isScreenSharing);
+    button?.classList.toggle("active-on", isScreenSharing);
     if (isScreenSharing) {
       const publication = room.localParticipant.getTrackPublication(Track.Source.ScreenShare);
       if (publication?.videoTrack) showScreenTrack(publication.videoTrack);
@@ -551,7 +755,7 @@ async function handleSendChat(event) {
 }
 
 function promptEva() {
-  if (window.innerWidth < 768) toggleTranscriptDrawer(true);
+  toggleTranscriptDrawer(true);
   const input = document.getElementById("chat-input");
   if (!input) return;
   window.requestAnimationFrame(() => input.focus());
@@ -565,47 +769,182 @@ function toggleTranscriptDrawer(forceOpen) {
   const shouldOpen = typeof forceOpen === "boolean" ? forceOpen : drawer.classList.contains("hidden");
   drawer.classList.toggle("hidden", !shouldOpen);
   drawer.classList.toggle("flex", shouldOpen);
-  button?.setAttribute("aria-expanded", String(shouldOpen));
+  button?.classList.toggle("active-on", shouldOpen);
 }
 
 async function copyClientInvite() {
-  if (!apiToken) {
-    window.alert("Only founder/admin can create client invite links.");
-    return;
-  }
-  const identity = window.prompt("Client name", "Client");
-  if (!identity) return;
+  const clientName = window.prompt("Enter Client name for invite link:", "Client");
+  if (!clientName) return;
   try {
     const data = await fetchJson("/api/meet/invite", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify({ room_name: roomName, identity }),
+      body: JSON.stringify({ room_name: roomName, identity: clientName }),
     });
     await navigator.clipboard.writeText(data.join_url);
-    window.alert("Client link copied. It expires in one hour.");
+    window.alert("Client invite link copied to clipboard! Valid for 1 hour.");
   } catch (error) {
-    window.alert(error.message || "Could not create invite.");
+    // If backend requires auth or endpoint unavailable, generate standard room URL
+    const url = `${window.location.origin}/meet?room=${encodeURIComponent(roomName)}`;
+    await navigator.clipboard.writeText(url);
+    window.alert(`Room link copied to clipboard:\n${url}`);
   }
 }
 
 async function endCall() {
-  if (room) await room.disconnect();
-  window.location.reload();
+  if (room) {
+    await room.disconnect();
+    room = null;
+  }
+  showView("postCall");
 }
 
-window.toggleAudio = toggleAudio;
-window.toggleVideo = toggleVideo;
-window.toggleScreenShare = toggleScreenShare;
-window.handleSendChat = handleSendChat;
-window.promptEva = promptEva;
-window.toggleTranscriptDrawer = toggleTranscriptDrawer;
-window.copyClientInvite = copyClientInvite;
-window.endCall = endCall;
-window.appendTranscript = appendTranscript;
+// =========================================================
+// DOM Event Listeners & Initialization
+// =========================================================
 
 window.addEventListener("DOMContentLoaded", () => {
-  readLobbyContext();
+  // 1. Live Header Clock
+  updateHeaderClock();
+  setInterval(updateHeaderClock, 1000);
+
+  // 2. Carousel Controls & Autoplay
+  startCarouselAutoPlay();
+  const carouselEl = document.querySelector(".carousel-card");
+  carouselEl?.addEventListener("mouseenter", stopCarouselAutoPlay);
+  carouselEl?.addEventListener("mouseleave", startCarouselAutoPlay);
+
+  document.getElementById("carousel-next-btn")?.addEventListener("click", () => {
+    setCarouselSlide(currentSlide + 1);
+  });
+  document.getElementById("carousel-prev-btn")?.addEventListener("click", () => {
+    setCarouselSlide(currentSlide - 1);
+  });
+  document.querySelectorAll(".carousel-dot").forEach((dot) => {
+    dot.addEventListener("click", () => {
+      const idx = parseInt(dot.getAttribute("data-dot") || "0", 10);
+      setCarouselSlide(idx);
+    });
+  });
+
+  // 3. Google Meet "New Meeting" Dropdown
+  const newMeetingBtn = document.getElementById("btn-new-meeting");
+  const newMeetingDropdown = document.getElementById("new-meeting-dropdown");
+
+  newMeetingBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    newMeetingDropdown?.classList.toggle("hidden");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!newMeetingBtn?.contains(e.target) && !newMeetingDropdown?.contains(e.target)) {
+      newMeetingDropdown?.classList.add("hidden");
+    }
+  });
+
+  // 4. "Create meeting for later"
+  document.getElementById("opt-create-later")?.addEventListener("click", () => {
+    newMeetingDropdown?.classList.add("hidden");
+    const slug = generateMeetingSlug();
+    const url = `${window.location.origin}/meet?room=${encodeURIComponent(slug)}`;
+    const input = document.getElementById("generated-meeting-url");
+    if (input) input.value = url;
+    document.getElementById("modal-create-later")?.classList.remove("hidden");
+  });
+
+  document.getElementById("close-modal-later-btn")?.addEventListener("click", () => {
+    document.getElementById("modal-create-later")?.classList.add("hidden");
+  });
+
+  document.getElementById("copy-later-url-btn")?.addEventListener("click", async () => {
+    const input = document.getElementById("generated-meeting-url");
+    if (input) {
+      await navigator.clipboard.writeText(input.value);
+      const badge = document.getElementById("copy-confirmation-badge");
+      badge?.classList.remove("hidden");
+      setTimeout(() => badge?.classList.add("hidden"), 3000);
+    }
+  });
+
+  document.getElementById("join-now-from-modal-btn")?.addEventListener("click", () => {
+    const input = document.getElementById("generated-meeting-url");
+    document.getElementById("modal-create-later")?.classList.add("hidden");
+    if (input) {
+      const url = new URL(input.value);
+      const r = url.searchParams.get("room") || "deploymate-main";
+      document.getElementById("room-input").value = r;
+      setText("lobby-room-badge", r);
+    }
+    showView("lobby");
+  });
+
+  // 5. "Start an instant meeting"
+  const startInstantMeeting = () => {
+    newMeetingDropdown?.classList.add("hidden");
+    const slug = generateMeetingSlug();
+    document.getElementById("room-input").value = slug;
+    setText("lobby-room-badge", slug);
+    showView("lobby");
+  };
+
+  document.getElementById("opt-instant-meeting")?.addEventListener("click", startInstantMeeting);
+  document.getElementById("cta-instant-start")?.addEventListener("click", startInstantMeeting);
+
+  // 6. "Start Founder session"
+  document.getElementById("opt-founder-session")?.addEventListener("click", () => {
+    newMeetingDropdown?.classList.add("hidden");
+    document.getElementById("room-input").value = "deploymate-main";
+    document.getElementById("identity-input").value = "Ajay (Founder)";
+    setText("lobby-room-badge", "deploymate-main");
+    showView("lobby");
+  });
+
+  // 7. Quick Join input + button
+  const quickJoinInput = document.getElementById("quick-join-input");
+  const quickJoinBtn = document.getElementById("quick-join-btn");
+
+  quickJoinInput?.addEventListener("input", () => {
+    const hasVal = Boolean(quickJoinInput.value.trim());
+    quickJoinBtn.disabled = !hasVal;
+    quickJoinBtn.classList.toggle("text-[#767676]", !hasVal);
+    quickJoinBtn.classList.toggle("border-[#e5e5e5]", !hasVal);
+    quickJoinBtn.classList.toggle("cursor-not-allowed", !hasVal);
+    quickJoinBtn.classList.toggle("bg-[#e6391e]", hasVal);
+    quickJoinBtn.classList.toggle("border-[#e6391e]", hasVal);
+    quickJoinBtn.classList.toggle("text-white", hasVal);
+    quickJoinBtn.classList.toggle("hover:bg-[#c90c0f]", hasVal);
+  });
+
+  const handleQuickJoin = () => {
+    const val = quickJoinInput.value.trim();
+    if (!val) return;
+    let targetRoom = val;
+    if (val.includes("http://") || val.includes("https://") || val.includes("room=")) {
+      try {
+        const u = new URL(val.startsWith("http") ? val : `https://${val}`);
+        targetRoom = u.searchParams.get("room") || u.searchParams.get("room_name") || val;
+      } catch (_) {}
+    }
+    document.getElementById("room-input").value = targetRoom;
+    setText("lobby-room-badge", targetRoom);
+    showView("lobby");
+  };
+
+  quickJoinBtn?.addEventListener("click", handleQuickJoin);
+  quickJoinInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") handleQuickJoin();
+  });
+
+  // 8. Pre-Join Green Room device preview controls
+  document.getElementById("preview-mic-toggle")?.addEventListener("click", togglePreviewMic);
+  document.getElementById("preview-cam-toggle")?.addEventListener("click", togglePreviewCam);
+  document.getElementById("back-home-btn")?.addEventListener("click", () => showView("homepage"));
+  document.getElementById("lobby-cancel-btn")?.addEventListener("click", () => showView("homepage"));
+
+  // 9. Meeting Join Form
   document.getElementById("join-form")?.addEventListener("submit", joinMeetingRoom);
+
+  // 10. In-Call Stage Controls
   document.getElementById("chat-form")?.addEventListener("submit", handleSendChat);
   document.getElementById("mic-btn")?.addEventListener("click", toggleAudio);
   document.getElementById("cam-btn")?.addEventListener("click", toggleVideo);
@@ -616,35 +955,68 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("header-invite-btn")?.addEventListener("click", copyClientInvite);
   document.getElementById("footer-invite-btn")?.addEventListener("click", copyClientInvite);
   document.getElementById("end-call-btn")?.addEventListener("click", endCall);
-  document.getElementById("dark-mode-btn")?.addEventListener("click", () => {
-    document.body.classList.toggle("dark");
+
+  // 11. Post-Call Screen buttons
+  document.getElementById("post-call-rejoin-btn")?.addEventListener("click", () => showView("lobby"));
+  document.getElementById("post-call-home-btn")?.addEventListener("click", () => {
+    window.history.replaceState({}, document.title, window.location.pathname);
+    showView("homepage");
   });
+
+  // 12. Dark Mode Toggle with persistence
+  const applyTheme = (isDark) => {
+    document.documentElement.classList.toggle("dark", isDark);
+    document.body.classList.toggle("dark", isDark);
+    const darkBtnIcon = document.querySelector("#dark-mode-btn span");
+    if (darkBtnIcon) {
+      darkBtnIcon.textContent = isDark ? "light_mode" : "dark_mode";
+    }
+  };
+
+  const savedTheme = localStorage.getItem("deploymate_theme");
+  if (savedTheme === "dark") {
+    applyTheme(true);
+  }
+
+  document.getElementById("dark-mode-btn")?.addEventListener("click", () => {
+    const isDarkNow = !document.body.classList.contains("dark");
+    applyTheme(isDarkNow);
+    localStorage.setItem("deploymate_theme", isDarkNow ? "dark" : "light");
+  });
+
+  // 13. Language Switch in Call
+  document.getElementById("language-btn")?.addEventListener("click", async () => {
+    const newLang = prompt("Enter new language code (hi, en, zh, ja, ko, ar, es, fr, de, pt):", myLanguage);
+    if (newLang && newLang !== myLanguage) {
+      myLanguage = newLang;
+      try {
+        await fetchJson("/api/meet/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({
+            room_name: roomName,
+            identity: currentParticipant,
+            language: myLanguage,
+          }),
+        });
+        alert(`Language updated to ${myLanguage}. Live translation stream adjusted.`);
+      } catch (e) {
+        alert("Failed to update language.");
+      }
+    }
+  });
+
+  // 14. Initial Context Read
+  readLobbyContext();
 });
 
-// ---- Language Switch ----
-document.addEventListener("DOMContentLoaded", () => {
-  const langBtn = document.getElementById("language-btn");
-  if (langBtn) {
-    langBtn.addEventListener("click", async () => {
-      const newLang = prompt("Enter new language code (hi, en, zh, ja, ko, ar, es, fr, de, pt):", myLanguage);
-      if (newLang && newLang !== myLanguage) {
-        myLanguage = newLang;
-        // Tell the server to update our language and reconcile agents
-        try {
-          await fetchJson("/api/meet/token", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...authHeaders() },
-            body: JSON.stringify({
-              room_name: roomName,
-              identity: currentParticipant,
-              language: myLanguage,
-            }),
-          });
-          alert(`Language updated to ${myLanguage}. The translation stream will switch momentarily.`);
-        } catch (e) {
-          alert("Failed to update language.");
-        }
-      }
-    });
-  }
-});
+// Export helper for debugging
+window.toggleAudio = toggleAudio;
+window.toggleVideo = toggleVideo;
+window.toggleScreenShare = toggleScreenShare;
+window.handleSendChat = handleSendChat;
+window.promptEva = promptEva;
+window.toggleTranscriptDrawer = toggleTranscriptDrawer;
+window.copyClientInvite = copyClientInvite;
+window.endCall = endCall;
+window.appendTranscript = appendTranscript;
